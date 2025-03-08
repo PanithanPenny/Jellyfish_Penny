@@ -1,138 +1,130 @@
-let offsetX = 0, offsetY = 0; // Current position offsets for the shape
-let velocityX = 0.4, velocityY = 0.4; // Velocity of the shape
-let prevMouseX, prevMouseY; // Previous mouse coordinates
-let dragging = false; // Whether the mouse is dragging the shape
-const damping = 0.90; // Damping factor to simulate friction
-const elasticity = 8; // Elasticity for bounce
+// Improved variable names for readability
+let shapeOffsetX = 0, shapeOffsetY = 0; // Position offsets for the shape
+let shapeVelocityX = 0.4, shapeVelocityY = 0.4; // Velocity of the shape
+let lastMouseX, lastMouseY; // Previous mouse coordinates
+let isDragging = false; // Tracks if the mouse is dragging the shape
+const velocityDamping = 0.90; // Factor to reduce velocity over time
+const bounceFactor = 8; // Elasticity for bounce effects
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  // background(0);
   frameRate(60);
 }
 
-
 function checkEdges() {
   // Wrap around horizontally
-  if (offsetX > width / 2) {
-    offsetX = -width / 2;
-  } else if (offsetX < -width / 2) {
-    offsetX = width / 2;
+  if (shapeOffsetX > width / 2) {
+    shapeOffsetX = -width / 2;
+  } else if (shapeOffsetX < -width / 2) {
+    shapeOffsetX = width / 2;
   }
 
   // Wrap around vertically
-  if (offsetY > height / 2) {
-    offsetY = -height / 2;
-  } else if (offsetY < -height / 2) {
-    offsetY = height / 2;
+  if (shapeOffsetY > height / 2) {
+    shapeOffsetY = -height / 2;
+  } else if (shapeOffsetY < -height / 2) {
+    shapeOffsetY = height / 2;
   }
 }
 
 function draw() {
-  let i = frameCount;
-  background(0,90);
+  let currentFrame = frameCount;
+  background(0, 90);
 
-  checkEdges(); // Check and adjust for edges to wrap around
+  checkEdges(); // Adjust position if shape moves beyond edges
 
   if (mouseIsPressed) {
     let targetX = mouseX - width / 2;
     let targetY = mouseY - height / 2;
-    offsetX = lerp(offsetX, targetX, 0.03);
-    offsetY = lerp(offsetY, targetY, 0.03);
-    
+    shapeOffsetX = lerp(shapeOffsetX, targetX, 0.03);
+    shapeOffsetY = lerp(shapeOffsetY, targetY, 0.03);
   } else {
     // Apply physics when not dragging
-    offsetX += velocityX;
-    offsetY += velocityY;
+    shapeOffsetX += shapeVelocityX;
+    shapeOffsetY += shapeVelocityY;
 
-    // Apply damping
-    velocityX *= damping;
-    velocityY *= damping;
+    // Apply damping to velocity
+    shapeVelocityX *= velocityDamping;
+    shapeVelocityY *= velocityDamping;
 
-    // Check for canvas boundaries and bounce
+    // Ensure shape wraps around when out of bounds
     checkEdges();
-    
-   
   }
 
-  const centerX = width / 2 + offsetX;
-  const centerY = height / 2 + offsetY;
+  const centerX = width / 2 + shapeOffsetX;
+  const centerY = height / 2 + shapeOffsetY;
 
   stroke(255, 20);
   strokeWeight(1);
   noFill();
-  // translate(0, -150);
-  
-    translate(centerX - windowWidth/2, centerY - windowHeight/1.5); // Ensure the translate reflects the current dragging position
+
+  translate(centerX - windowWidth / 2, centerY - windowHeight / 1.5);
 
   for (let angle = 1; angle <= 360; angle += 0.2) {
-    drawMainShape(i, angle, centerX, centerY, 200 * noise(i / 300) + 100);
-      }
+    drawMainShape(currentFrame, angle, centerX, centerY, 200 * noise(currentFrame / 300) + 100);
+  }
 
   for (let angle = 1; angle <= 360; angle += 20) {
-    drawSecondaryShape(i, angle, centerX, centerY);
+    drawSecondaryShape(currentFrame, angle, centerX, centerY);
   }
 }
 
 function mousePressed() {
-  dragging = true;
-  prevMouseX = mouseX;
-  prevMouseY = mouseY;
+  isDragging = true;
+  lastMouseX = mouseX;
+  lastMouseY = mouseY;
 }
 
-let dx = 0, dy = 0;
+let mouseDeltaX = 0, mouseDeltaY = 0;
 
 function mouseDragged() {
-//    if (dragging) {
-//     dx = lerp(dx, mouseX - prevMouseX, 0.1);
-//     dy = lerp(dy, mouseY - prevMouseY, 0.1);
+  // Un-comment if you want dragging physics
+  // if (isDragging) {
+  //   mouseDeltaX = lerp(mouseDeltaX, mouseX - lastMouseX, 0.1);
+  //   mouseDeltaY = lerp(mouseDeltaY, mouseY - lastMouseY, 0.1);
 
-//     // Apply the movement to offsets and velocity for both X and Y
-//     offsetX += dx;
-//     offsetY += dy;
-//     velocityX = dx * 0.01; // Adjust for inertia
-//     velocityY = dy * 0.01;
+  //   // Apply movement changes to offset and velocity
+  //   shapeOffsetX += mouseDeltaX;
+  //   shapeOffsetY += mouseDeltaY;
+  //   shapeVelocityX = mouseDeltaX * 0.01; // Adjust for inertia
+  //   shapeVelocityY = mouseDeltaY * 0.01;
 
-//     prevMouseX = mouseX;
-//     prevMouseY = mouseY;
-//   }
+  //   lastMouseX = mouseX;
+  //   lastMouseY = mouseY;
+  // }
 }
 
 function mouseReleased() {
-  dragging = false;
-
+  isDragging = false;
 }
 
-
-
-//Bell shape body
-function drawMainShape(i, angle, centerX, centerY, radius) {
+// Main shape (bell body)
+function drawMainShape(currentFrame, angle, centerX, centerY, radius) {
   const x = centerX + radius * cos(radians(angle));
-  const y = centerY + radius * sin(radians(angle)) + (200- noise(radians(angle), i / 100) * 400);
+  const y = centerY + radius * sin(radians(angle)) + (200 - noise(radians(angle), currentFrame / 100) * 400);
   
-  strokeColor(i, angle);
+  applyStrokeColor(currentFrame, angle);
   beginShape();
   curveVertex(centerX, centerY + 100);
-  const noiseValues = getNoiseValues(radius, i, angle, x, y, centerX, centerY);
+  const noiseValues = computeNoiseValues(radius, currentFrame, angle, x, y, centerX, centerY);
   curveVertex(centerX, centerY - 120 + noiseValues.noiseY);
   curveVertex(x, y / 25 + 400 + noiseValues.noiseY2);
   curveVertex(x + noiseValues.noiseX, y / 10 + 1000);
   endShape();
 }
 
-//Tentacles
-function drawSecondaryShape(i, angle, centerX, centerY) {
-  const radius2 = 20 * noise(i / 300) + 20;
+// Tentacles
+function drawSecondaryShape(currentFrame, angle, centerX, centerY) {
+  const radius2 = 20 * noise(currentFrame / 300) + 20;
   const x = centerX + radius2 * 3 * cos(radians(angle));
   const x2 = centerX + (radius2 / 2) * cos(radians(angle));
   const y = centerY + radius2 * sin(radians(angle));
   
-  strokeColor(i, angle);
-  strokeWeight(3);
-  
+  applyStrokeColor(currentFrame, angle);
+  strokeWeight(1.5);
+
   beginShape();
-  const noiseValues = getNoiseValues(radius2, i, angle, x, y, centerX, centerY);
-  
+  const noiseValues = computeNoiseValues(radius2, currentFrame, angle, x, y, centerX, centerY);
   curveVertex(x2, centerY + 200);
   curveVertex(x2, centerY - 40 + noiseValues.noiseY);
   curveVertex(x + noiseValues.noiseX2, y / 1.1 + 500 + noiseValues.noiseY2);
@@ -140,24 +132,26 @@ function drawSecondaryShape(i, angle, centerX, centerY) {
   endShape();
 }
 
-//Color here
-function strokeColor(i, angle) {
+// Improved function name for stroke color
+function applyStrokeColor(currentFrame, angle) {
   const noiseStrokeR = noise(radians(angle));
-  const noiseStrokeG = noise(radians(angle),i/30);
-  const noiseStrokeB = noise(radians(angle),i/60);
-  
+  const noiseStrokeG = noise(radians(angle), currentFrame / 30);
+  const noiseStrokeB = noise(radians(angle), currentFrame / 60);
+
   stroke(
-    Math.round(50 * noiseStrokeR),
-    Math.round(200 * noiseStrokeG),
-    Math.round(220 * noiseStrokeB + 50),
-    70  // Alpha value remains the same for transparency control
+    50 * noiseStrokeR,
+    180 * noiseStrokeG, 
+    220 * noiseStrokeB + 50,
+    40
   );
 }
 
-function getNoiseValues(radius, i, angle, x, y, centerX, centerY) {
-  const noiseY = noise(radius / 100) * 100;
-  const noiseY2 = 50 - noise(radius / 100, i / 120) * 100;
-  const noiseX = 500 - noise(radians(angle), i / 120) * 1100;
-  const noiseX2 = 100 - noise(radians(360 - angle), i / 200) * 200;
-  return { noiseY, noiseY2, noiseX, noiseX2 };
+// Improved function name for noise calculations
+function computeNoiseValues(radius, currentFrame, angle, x, y, centerX, centerY) {
+  return {
+    noiseY: noise(radius / 100) * 100,
+    noiseY2: 50 - noise(radius / 100, currentFrame / 120) * 100,
+    noiseX: 500 - noise(radians(angle), currentFrame / 120) * 1100,
+    noiseX2: 100 - noise(radians(360 - angle), currentFrame / 200) * 200
+  };
 }
