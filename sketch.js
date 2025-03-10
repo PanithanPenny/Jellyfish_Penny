@@ -1,66 +1,135 @@
 // Improved variable names for clarity and maintainability
-let jellyfishOffsetX = 0, jellyfishOffsetY = 0; // Position offsets for movement
-let jellyfishVelocityX = 0.4, jellyfishVelocityY = 0.4; // Movement speed
-let lastMouseX, lastMouseY; // Stores previous mouse position
-let isDragging = false; // Tracks if the user is dragging
-const VELOCITY_DAMPING = 0.90; // Reduces velocity over time
-const BOUNCE_FACTOR = 8; // Defines elasticity for bounce effects
+// Refactored into Class-Based Jellyfish
+// Magic numbers replaced with named constants
 
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  frameRate(60);
+const DEFAULT_RADIUS_NOISE_SCALE = 300;
+const BASE_RADIUS = 200;
+const RADIUS_OFFSET = 100;
+const VELOCITY_DAMPING = 0.90;
+const BODY_Y_OFFSET = 200;
+const BODY_NOISE_AMPLITUDE = 400;
+const TENTACLE_RADIUS_MULTIPLIER = 3;
+const TENTACLE_RADIUS_OFFSET = 20;
+const TENTACLE_STROKE_WEIGHT = 6;
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 800;
+
+const NOISE_DIVISORS = {
+  noiseY: 1 / 120,
+  noiseY2: 1 / 120,
+  noiseX: 1 / 120,
+  noiseX2: 1 / 200,
+  strokeG: 1 / 30,
+  strokeB: 1 / 60,
+  bodyOffset: 1 / 100
+};
+
+class Jellyfish {
+  constructor(xOffset, yOffset, xVelocity, yVelocity) {
+    this.offsetX = xOffset;
+    this.offsetY = yOffset;
+    this.velocityX = xVelocity;
+    this.velocityY = yVelocity;
+  }
+
+  updatePosition(mouseIsPressed, mouseX, mouseY, frameRateValue) {
+    if (mouseIsPressed) {
+      const targetX = mouseX - CANVAS_WIDTH / 2;
+      const targetY = mouseY - CANVAS_HEIGHT / 2;
+      this.offsetX = lerp(this.offsetX, targetX, 0.03);
+      this.offsetY = lerp(this.offsetY, targetY, 0.03);
+    } else {
+      this.offsetX += this.velocityX;
+      this.offsetY += this.velocityY;
+      this.velocityX *= VELOCITY_DAMPING;
+      this.velocityY *= VELOCITY_DAMPING;
+    }
+    this.wrapAroundEdges(CANVAS_WIDTH, CANVAS_HEIGHT);
+  }
+
+  wrapAroundEdges(canvasWidth, canvasHeight) {
+    if (this.offsetX > canvasWidth / 2) this.offsetX = -canvasWidth / 2;
+    if (this.offsetX < -canvasWidth / 2) this.offsetX = canvasWidth / 2;
+    if (this.offsetY > canvasHeight / 2) this.offsetY = -canvasHeight / 2;
+    if (this.offsetY < -canvasHeight / 2) this.offsetY = canvasHeight / 2;
+  }
+
+  draw(frame) {
+    const centerX = CANVAS_WIDTH / 2 + this.offsetX;
+    const centerY = CANVAS_HEIGHT / 2 + this.offsetY;
+    translate(centerX - CANVAS_WIDTH / 2, centerY - CANVAS_HEIGHT / 1.5);
+    const radius = BASE_RADIUS * noise(frame / DEFAULT_RADIUS_NOISE_SCALE) + RADIUS_OFFSET;
+
+    for (let angle = 1; angle <= 360; angle += 0.2) {
+      this.drawBody(frame, angle, centerX, centerY, radius);
+    }
+    for (let angle = 1; angle <= 360; angle += 20) {
+      this.drawTentacle(frame, angle, centerX, centerY);
+    }
+  }
+
+  drawBody(frame, angle, centerX, centerY, radius) {
+    const x = centerX + radius * cos(radians(angle));
+    const y = centerY + radius * sin(radians(angle)) + 
+      (BODY_Y_OFFSET - noise(radians(angle), frame * NOISE_DIVISORS.bodyOffset) * BODY_NOISE_AMPLITUDE);
+
+    this.applyStrokeColor(frame, angle);
+    beginShape();
+    curveVertex(centerX, centerY + 100);
+    const n = computeNoise(radius, frame, angle);
+    curveVertex(centerX, centerY - 120 + n.noiseY);
+    curveVertex(x, y / 25 + 400 + n.noiseY2);
+    curveVertex(x + n.noiseX, y / 10 + 1000);
+    endShape();
+  }
+
+  drawTentacle(frame, angle, centerX, centerY) {
+    const radius = TENTACLE_RADIUS_OFFSET * noise(frame / DEFAULT_RADIUS_NOISE_SCALE) + TENTACLE_RADIUS_OFFSET;
+    const x = centerX + radius * TENTACLE_RADIUS_MULTIPLIER * cos(radians(angle));
+    const x2 = centerX + (radius / 2) * cos(radians(angle));
+    const y = centerY + radius * sin(radians(angle));
+
+    this.applyStrokeColor(frame, angle);
+    strokeWeight(TENTACLE_STROKE_WEIGHT);
+    beginShape();
+    const n = computeNoise(radius, frame, angle);
+    curveVertex(x2, centerY + 200);
+    curveVertex(x2, centerY - 40 + n.noiseY);
+    curveVertex(x + n.noiseX2, y / 1.1 + 500 + n.noiseY2);
+    curveVertex(x + n.noiseX, y / 10 + 1000);
+    endShape();
+  }
+
+  applyStrokeColor(frame, angle) {
+    const r = noise(radians(angle));
+    const g = noise(radians(angle), frame * NOISE_DIVISORS.strokeG);
+    const b = noise(radians(angle), frame * NOISE_DIVISORS.strokeB);
+    stroke(50 * r, 180 * g, 220 * b + 50, 40);
+  }
 }
 
-function wrapAroundEdges() {
-  // Horizontally wrap
-  if (jellyfishOffsetX > width / 2) {
-    jellyfishOffsetX = -width / 2;
-  } else if (jellyfishOffsetX < -width / 2) {
-    jellyfishOffsetX = width / 2;
-  }
+function computeNoise(radius, frame, angle) {
+  return {
+    noiseY: noise(radius / 100) * 100,
+    noiseY2: 50 - noise(radius / 100, frame * NOISE_DIVISORS.noiseY2) * 100,
+    noiseX: 500 - noise(radians(angle), frame * NOISE_DIVISORS.noiseX) * 1100,
+    noiseX2: 100 - noise(radians(360 - angle), frame * NOISE_DIVISORS.noiseX2) * 200
+  };
+}
 
-  // Vertically wrap
-  if (jellyfishOffsetY > height / 2) {
-    jellyfishOffsetY = -height / 2;
-  } else if (jellyfishOffsetY < -height / 2) {
-    jellyfishOffsetY = height / 2;
-  }
+// P5 Setup
+let CreateJellyfish;
+
+function setup() {
+  createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+  frameRate(60);
+  CreateJellyfish = new Jellyfish(0, 0, 0.4, 0.4);
 }
 
 function draw() {
-  let currentFrame = frameCount;
   background(0, 90);
-
-  wrapAroundEdges(); 
-
-  if (mouseIsPressed) {
-    let targetX = mouseX - width / 2;
-    let targetY = mouseY - height / 2;
-    jellyfishOffsetX = lerp(jellyfishOffsetX, targetX, 0.03);
-    jellyfishOffsetY = lerp(jellyfishOffsetY, targetY, 0.03);
-  } else {
-    // Apply physics when not dragging
-    jellyfishOffsetX += jellyfishVelocityX;
-    jellyfishOffsetY += jellyfishVelocityY;
-
-    // Apply damping to velocity
-    jellyfishVelocityX *= VELOCITY_DAMPING;
-    jellyfishVelocityY *= VELOCITY_DAMPING;
-
-    // Ensure shape wraps around when out of bounds
-    wrapAroundEdges();
-  }
-
-  const centerX = width / 2 + jellyfishOffsetX;
-  const centerY = height / 2 + jellyfishOffsetY;
-
-  stroke(255, 20);
-  strokeWeight(1);
-  noFill();
-
-  translate(centerX - windowWidth / 2, centerY - windowHeight / 1.5);
-
-  drawJellyfish(currentFrame, centerX, centerY);
+  CreateJellyfish.updatePosition(mouseIsPressed, mouseX, mouseY, frameRate());
+  CreateJellyfish.draw(frameCount);
 }
 
 function mousePressed() {
@@ -72,77 +141,3 @@ function mousePressed() {
 function mouseReleased() {
   isDragging = false;
 }
-
-// Draws the jellyfish body and tentacles
-function drawJellyfish(currentFrame, centerX, centerY) {
-  const baseRadius = 200 * noise(currentFrame / 300) + 100;
-
-  for (let angle = 1; angle <= 360; angle += 0.2) {
-    drawJellyfishBody(currentFrame, angle, centerX, centerY, baseRadius);
-  }
-
-  for (let angle = 1; angle <= 360; angle += 20) {
-    drawJellyfishTentacles(currentFrame, angle, centerX, centerY);
-  }
-}
-
-// Draws the main body of the jellyfish
-function drawJellyfishBody(currentFrame, angle, centerX, centerY, radius) {
-  const x = centerX + radius * cos(radians(angle));
-  const y = centerY + radius * sin(radians(angle)) + (200 - noise(radians(angle), currentFrame / 100) * 400);
-
-  applyDynamicStrokeColor(currentFrame, angle);
-  beginShape();
-  curveVertex(centerX, centerY + 100);
-  const noiseValues = computeNoise(radius, currentFrame, angle, x, y, centerX, centerY);
-  curveVertex(centerX, centerY - 120 + noiseValues.noiseY);
-  curveVertex(x, y / 25 + 400 + noiseValues.noiseY2);
-  curveVertex(x + noiseValues.noiseX, y / 10 + 1000);
-  endShape();
-}
-
-// Draws the jellyfish tentacles
-function drawJellyfishTentacles(currentFrame, angle, centerX, centerY) {
-  const tentacleRadius = 20 * noise(currentFrame / 300) + 20;
-  const x = centerX + tentacleRadius * 3 * cos(radians(angle));
-  const x2 = centerX + (tentacleRadius / 2) * cos(radians(angle));
-  const y = centerY + tentacleRadius * sin(radians(angle));
-
-  applyDynamicStrokeColor(currentFrame, angle);
-  strokeWeight(6);
-
-  beginShape();
-  const noiseValues = computeNoise(tentacleRadius, currentFrame, angle, x, y, centerX, centerY);
-  curveVertex(x2, centerY + 200);
-  curveVertex(x2, centerY - 40 + noiseValues.noiseY);
-  curveVertex(x + noiseValues.noiseX2, y / 1.1 + 500 + noiseValues.noiseY2);
-  curveVertex(x + noiseValues.noiseX, y / 10 + 1000);
-  endShape();
-}
-
-// Applies dynamic stroke color based on movement and noise
-function applyDynamicStrokeColor(currentFrame, angle) {
-  const noiseStrokeR = noise(radians(angle));
-  const noiseStrokeG = noise(radians(angle), currentFrame / 30);
-  const noiseStrokeB = noise(radians(angle), currentFrame / 60);
-
-  stroke(
-    50 * noiseStrokeR,
-    180 * noiseStrokeG, 
-    220 * noiseStrokeB + 50,
-    40
-  );
-}
-
-// Computes noise values for fluid movement effects
-function computeNoise(radius, currentFrame, angle, x, y, centerX, centerY) {
-  return {
-    noiseY: noise(radius / 100) * 100,
-    noiseY2: 50 - noise(radius / 100, currentFrame / 120) * 100,
-    noiseX: 500 - noise(radians(angle), currentFrame / 120) * 1100,
-    noiseX2: 100 - noise(radians(360 - angle), currentFrame / 200) * 200
-  };
-}
-
-
-
